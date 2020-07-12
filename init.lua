@@ -43,7 +43,7 @@ minetest.register_node("lightup:brightwater", {
 	},
 	alpha = 191,
 	light_source = brightness,
-	paramtype = "light",   -- this is important !! do not use "light"
+	paramtype = "light",
 	walkable = false,
 	pointable = false,
 	diggable = false,
@@ -65,7 +65,7 @@ minetest.register_lbm({                            -- this is to remove old brig
 		end,
 	})
 
-minetest.register_lbm({                            -- this is to remove old bright water nodes after server crash etc
+minetest.register_lbm({                            -- this is to remove old bright air nodes after server crash etc
 	name = "lightup:delete_airlights",
 	run_at_every_load = true,
 		nodenames = {"lightup:brightair"},
@@ -135,22 +135,31 @@ minetest.register_globalstep(function(dtime)
 						if node and node.name == "default:water_source" then
 							minetest.swap_node(target, {name="lightup:brightwater"})
 							minetest.after(turnoff,function(target)
-										minetest.swap_node(target, {name="default:water_source"})
-										end, target)
+										local node = minetest.get_node_or_nil(target)
+										if node and node.name == "lightup:brightwater" then
+											minetest.swap_node(target, {name="default:water_source"})
+										end
+							end, target)
 						end
                             
 						if node and node.name == "default:water_flowing" then
 							minetest.swap_node(target, {name="lightup:brightwater"})
 							minetest.after(turnoff,function(target)
-										minetest.swap_node(target, {name="default:water_flowing"})
-										end, target)
+										local node = minetest.get_node_or_nil(target)
+										if node and node.name == "lightup:brightwater" then
+											minetest.swap_node(target, {name="default:water_flowing"})
+										end
+							end, target)
 						end
 						
 						if node and node.name == "air" then
 							minetest.swap_node(target, {name="lightup:brightair"})
 							minetest.after(turnoff,function(target)
-										minetest.swap_node(target, {name="air"})
-										end, target)
+                                                  local node = minetest.get_node_or_nil(target)
+										if node and node.name == "lightup:brightair" then
+											minetest.swap_node(target, {name="air"})
+										end
+							end, target)
 						end
 				end
 			end
