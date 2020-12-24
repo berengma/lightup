@@ -2,10 +2,12 @@
 --
 -- WTFPL by Gundul
 
+lightup = {}
+lightup.switch = {}
 
 local timer = 0				-- do not touch
 local check = 0.5				-- intervall in which is checked for light, the smaller the more realistic but the harder for cpu
-local turnoff = 1				-- after how many seconds the light is turned off again
+local turnoff = 1.5				-- after how many seconds the light is turned off again
 local distance = 20				-- max distance of the torchlight
 local brightness = 14			-- max brightness
 
@@ -13,68 +15,27 @@ local brightness = 14			-- max brightness
 minetest.register_privilege("lightup", {description ="automatic light in air and water"})
 
 
+-- register water and airnodes, together with their new brothers. 
+lightup.switch[1] = {name="default:water_source", change="lightup:brightwater"}
+lightup.switch[2] = {name="default:water_flowing", change="lightup:brightwater"}
+lightup.switch[3] = {name="default:river_water_source", change="lightup:brightriverwater"}
+lightup.switch[4] = {name="default:river_water_flowing", change="lightup:brightriverwater"}
+lightup.switch[5] = {name="water_life:muddy_river_water_source", change="lightup:brightmuddywater"}
+lightup.switch[6] = {name="water_life:muddy_river_water_flowing", change="lightup:brightmuddywater"}
+lightup.switch[7] = {name="air", change="lightup:brightair"}
 
 
-minetest.register_node("lightup:brightwater", {
-	description = ("Water Source"),
-	drawtype = "liquid",
-	waving = 3,
-	tiles = {
-		{
-			name = "default_water_source_animated.png",
-			backface_culling = false,
-			animation = {
-				type = "vertical_frames",
-				aspect_w = 16,
-				aspect_h = 16,
-				length = 2.0,
-			},
-		},
-		{
-			name = "default_water_source_animated.png",
-			backface_culling = true,
-			animation = {
-				type = "vertical_frames",
-				aspect_w = 16,
-				aspect_h = 16,
-				length = 2.0,
-			},
-		},
-	},
-	alpha = 191,
-	light_source = brightness,
-	paramtype = "light",
-	walkable = false,
-	pointable = false,
-	diggable = false,
-	buildable_to = true,
-	is_ground_content = false,
-	drop = "",
-	drowning = 1,
-	sounds = default.node_sound_water_defaults(),
-})
+-- this function is taken from Termos' mobkit api.
+local function pos_shift(pos,vec) -- vec components can be omitted e.g. vec={y=1}
+	vec.x=vec.x or 0
+	vec.y=vec.y or 0
+	vec.z=vec.z or 0
+	return {x=pos.x+vec.x,
+			y=pos.y+vec.y,
+			z=pos.z+vec.z}
+end
 
-
-
-minetest.register_lbm({                            -- this is to remove old bright water nodes after server crash etc
-	name = "lightup:delete_lights",
-	run_at_every_load = true,
-		nodenames = {"lightup:brightwater"},
-		action = function(pos, node)
-				minetest.set_node(pos, {name = "default:water_source"})
-		end,
-	})
-
-minetest.register_lbm({                            -- this is to remove old bright air nodes after server crash etc
-	name = "lightup:delete_airlights",
-	run_at_every_load = true,
-		nodenames = {"lightup:brightair"},
-		action = function(pos, node)
-				minetest.set_node(pos, {name = "air"})
-		end,
-	})
-
-
+-- the name says it all
 local function clone_node(node_name)
 	if not (node_name and type(node_name) == 'string') then
 		return
@@ -85,15 +46,16 @@ local function clone_node(node_name)
 end
 
 
+-- throwing a raycast
 local function find_collision(pos1,dir)
 	
-	pos1 = mobkit.pos_shift(pos1,vector.multiply(dir,1))
-	local pos2 = mobkit.pos_shift(pos1,vector.multiply(dir,distance))
+	pos1 = pos_shift(pos1,vector.multiply(dir,1))
+	local pos2 = pos_shift(pos1,vector.multiply(dir,distance))
 	local ray = minetest.raycast(pos1, pos2, true, false)
 			for pointed_thing in ray do
 				if pointed_thing.type == "node" then
 					local dist = math.floor(vector.distance(pos1,pointed_thing.under))
-					pos2 = mobkit.pos_shift(pos1,vector.multiply(dir,dist-1))
+					pos2 = pos_shift(pos1,vector.multiply(dir,dist-1))
 					return pos2
 				end
 				if pointed_thing.type == "object" then
@@ -106,12 +68,24 @@ local function find_collision(pos1,dir)
 end
 
 
+--register all that new bright nodes
+for i = 1,#lightup.switch,1 do
 
-local air = clone_node("air")
-air.light_source = brightness
-minetest.register_node('lightup:brightair', air)
+	if minetest.registered_nodes[lightup.switch[i].name] and not minetest.registered_nodes[lightup.switch[i].change] then
+		local water = clone_node(lightup.switch[i].name)
+		water.light_source = brightness
+		water.on_timer = function(pos, elapsed)
+						minetest.set_node(pos,{name=lightup.switch[i].name})				-- when node timer is elapsed turn back into src
+					end
+		minetest.register_node(lightup.switch[i].change, water)
+	end
+end
 
 
+
+-- globalstep to check for people with lightup priv
+-- change that check for a certain item in player inventory
+-- or whatever you want and need
 
 minetest.register_globalstep(function(dtime)
 
@@ -132,35 +106,27 @@ minetest.register_globalstep(function(dtime)
 				if target then		
 						local node = minetest.get_node_or_nil(target)
 						--minetest.chat_send_all(dump(node.name))
-						if node and node.name == "default:water_source" then
-							minetest.swap_node(target, {name="lightup:brightwater"})
-							minetest.after(turnoff,function(target)
-										local node = minetest.get_node_or_nil(target)
-										if node and node.name == "lightup:brightwater" then
-											minetest.swap_node(target, {name="default:water_source"})
-										end
-							end, target)
+                            
+						for i = 1,#lightup.switch,1 do
+                            
+							-- found a node ? change it into a bright brother
+							if node and node.name == lightup.switch[i].name then
+								minetest.swap_node(target, {name=lightup.switch[i].change})
+								minetest.after(1,function(target)
+											local timer = minetest.get_node_timer(target)
+											timer:start(turnoff)
+								end, target)
+							end
+							
+							-- still pointing to a bright node ? set nodetimer to max again.
+							if node and node.name == lightup.switch[i].change then
+								local timer = minetest.get_node_timer(target)
+								if timer:is_started() then
+									timer:set(turnoff,0)
+								end
+							end
 						end
                             
-						if node and node.name == "default:water_flowing" then
-							minetest.swap_node(target, {name="lightup:brightwater"})
-							minetest.after(turnoff,function(target)
-										local node = minetest.get_node_or_nil(target)
-										if node and node.name == "lightup:brightwater" then
-											minetest.swap_node(target, {name="default:water_flowing"})
-										end
-							end, target)
-						end
-						
-						if node and node.name == "air" then
-							minetest.swap_node(target, {name="lightup:brightair"})
-							minetest.after(turnoff,function(target)
-                                                  local node = minetest.get_node_or_nil(target)
-										if node and node.name == "lightup:brightair" then
-											minetest.swap_node(target, {name="air"})
-										end
-							end, target)
-						end
 				end
 			end
 		end
