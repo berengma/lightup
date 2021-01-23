@@ -6,8 +6,8 @@ lightup = {}
 lightup.switch = {}
 
 local timer = 0				-- do not touch
-local check = 0.5				-- intervall in which is checked for light, the smaller the more realistic but the harder for cpu
-local turnoff = 1.5				-- after how many seconds the light is turned off again
+local check = 0.1				-- intervall in which is checked for light, the smaller the more realistic but the harder for cpu
+local turnoff = 0.2				-- after how many seconds the light is turned off again
 local distance = 20				-- max distance of the torchlight
 local brightness = 14			-- max brightness
 
@@ -73,6 +73,9 @@ for i = 1,#lightup.switch,1 do
 
 	if minetest.registered_nodes[lightup.switch[i].name] and not minetest.registered_nodes[lightup.switch[i].change] then
 		local water = clone_node(lightup.switch[i].name)
+		water.liquid_alternative_flowing = lightup.switch[i].change
+		water.liquid_alternative_source = lightup.switch[i].change
+		water.groups.not_in_creative_inventory = 1
 		water.light_source = brightness
 		water.on_timer = function(pos, elapsed)
 						minetest.set_node(pos,{name=lightup.switch[i].name})				-- when node timer is elapsed turn back into src
