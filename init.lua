@@ -17,11 +17,11 @@ minetest.register_privilege("lightup", {description ="automatic light in air and
 
 -- register water and airnodes, together with their new brothers. 
 lightup.switch[1] = {name="default:water_source", change="lightup:brightwater"}
-lightup.switch[2] = {name="default:water_flowing", change="lightup:brightwater"}
+lightup.switch[2] = {name="default:water_flowing", change="lightup:brightwater_flowing"}
 lightup.switch[3] = {name="default:river_water_source", change="lightup:brightriverwater"}
-lightup.switch[4] = {name="default:river_water_flowing", change="lightup:brightriverwater"}
+lightup.switch[4] = {name="default:river_water_flowing", change="lightup:brightriverwater_flowing"}
 lightup.switch[5] = {name="water_life:muddy_river_water_source", change="lightup:brightmuddywater"}
-lightup.switch[6] = {name="water_life:muddy_river_water_flowing", change="lightup:brightmuddywater"}
+lightup.switch[6] = {name="water_life:muddy_river_water_flowing", change="lightup:brightmuddywater_flowing"}
 lightup.switch[7] = {name="air", change="lightup:brightair"}
 
 
@@ -77,6 +77,7 @@ for i = 1,#lightup.switch,1 do
 		water.liquid_alternative_source = lightup.switch[i].change
 		water.groups.not_in_creative_inventory = 1
 		water.light_source = brightness
+		water.liquid_renewable = false
 		water.on_timer = function(pos, elapsed)
 						minetest.set_node(pos,{name=lightup.switch[i].name})				-- when node timer is elapsed turn back into src
 					end
